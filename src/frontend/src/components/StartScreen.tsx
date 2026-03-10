@@ -1,5 +1,7 @@
+import { Canvas, useFrame } from "@react-three/fiber";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type * as THREE from "three";
 import type { PlayerProfile } from "../backend.d";
 import { useActor } from "../hooks/useActor";
 
@@ -7,6 +9,179 @@ interface StartScreenProps {
   onPlay: () => void;
   onShop: () => void;
 }
+
+// ── 3D Preview Scene ──────────────────────────────────────────────────────────
+
+function SpinningGiraffe() {
+  const groupRef = useRef<THREE.Group>(null!);
+
+  useFrame((state) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = state.clock.elapsedTime * 0.5;
+      groupRef.current.position.y =
+        Math.sin(state.clock.elapsedTime * 0.8) * 0.08;
+    }
+  });
+
+  return (
+    <group ref={groupRef} position={[0, -0.3, 0]}>
+      {/* Legs */}
+      {([-0.28, -0.1, 0.1, 0.28] as const).map((lx, i) => (
+        <mesh key={`leg-${lx}`} position={[lx, 0.22, i < 2 ? -0.12 : 0.12]}>
+          <boxGeometry args={[0.12, 0.52, 0.12]} />
+          <meshStandardMaterial color="#c8922a" />
+        </mesh>
+      ))}
+      {/* Body */}
+      <mesh position={[0, 0.68, 0]}>
+        <boxGeometry args={[0.82, 0.68, 0.5]} />
+        <meshStandardMaterial color="#e8b84a" />
+      </mesh>
+      {/* Neck */}
+      <mesh position={[0.22, 1.3, 0]} rotation={[0, 0, 0.15]}>
+        <boxGeometry args={[0.22, 0.82, 0.2]} />
+        <meshStandardMaterial color="#e8b84a" />
+      </mesh>
+      {/* Head */}
+      <mesh position={[0.32, 1.82, 0]}>
+        <boxGeometry args={[0.38, 0.3, 0.28]} />
+        <meshStandardMaterial color="#e8b84a" />
+      </mesh>
+      {/* Horns */}
+      <mesh position={[0.28, 1.98, 0.06]}>
+        <cylinderGeometry args={[0.025, 0.04, 0.22, 6]} />
+        <meshStandardMaterial color="#805010" />
+      </mesh>
+      <mesh position={[0.38, 1.98, 0.06]}>
+        <cylinderGeometry args={[0.025, 0.04, 0.22, 6]} />
+        <meshStandardMaterial color="#805010" />
+      </mesh>
+      {/* Eyes */}
+      <mesh position={[0.52, 1.84, 0.1]}>
+        <sphereGeometry args={[0.04, 6, 6]} />
+        <meshBasicMaterial color="#222" />
+      </mesh>
+      {/* Spots */}
+      {(
+        [
+          [0, 0.72, 0.26],
+          [0.2, 0.85, 0.26],
+          [-0.18, 0.9, 0.26],
+        ] as [number, number, number][]
+      ).map(([sx, sy, sz]) => (
+        <mesh key={`spot-${sx}-${sy}`} position={[sx, sy, sz]}>
+          <circleGeometry args={[0.07, 6]} />
+          <meshBasicMaterial color="#a06020" />
+        </mesh>
+      ))}
+      {/* Tail */}
+      <mesh position={[-0.35, 0.8, 0]} rotation={[0, 0, 0.6]}>
+        <cylinderGeometry args={[0.03, 0.02, 0.4, 6]} />
+        <meshStandardMaterial color="#c8922a" />
+      </mesh>
+    </group>
+  );
+}
+
+function FloatingCoins() {
+  const groupRef = useRef<THREE.Group>(null!);
+
+  useFrame((state) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = state.clock.elapsedTime * 1.1;
+    }
+  });
+
+  const positions: [number, number, number][] = [
+    [-1.6, 0.3, 0.2],
+    [1.6, 0.6, 0.5],
+    [0.2, 1.1, -1.3],
+    [-0.5, -0.1, 1.2],
+  ];
+
+  return (
+    <group ref={groupRef}>
+      {positions.map(([x, y, z], i) => (
+        <CoinSingle
+          key={`coin-${x}-${y}`}
+          position={[x, y, z]}
+          offset={i * 1.2}
+        />
+      ))}
+    </group>
+  );
+}
+
+function CoinSingle({
+  position,
+  offset,
+}: {
+  position: [number, number, number];
+  offset: number;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null!);
+
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += 0.06;
+      meshRef.current.position.y =
+        position[1] + Math.sin(state.clock.elapsedTime * 1.5 + offset) * 0.1;
+    }
+  });
+
+  return (
+    <mesh ref={meshRef} position={position} castShadow>
+      <cylinderGeometry args={[0.22, 0.22, 0.08, 16]} />
+      <meshStandardMaterial
+        color="#ffd700"
+        emissive="#aa7700"
+        emissiveIntensity={0.5}
+        metalness={0.9}
+        roughness={0.1}
+      />
+    </mesh>
+  );
+}
+
+function ZooPreview3D() {
+  return (
+    <Canvas
+      camera={{ position: [0, 1.5, 5], fov: 52 }}
+      style={{ width: "100%", height: "100%" }}
+      gl={{ antialias: true, alpha: true }}
+    >
+      <ambientLight intensity={0.75} color="#d8eeff" />
+      <directionalLight position={[4, 6, 4]} intensity={1.5} color="#fff8e0" />
+      <directionalLight
+        position={[-3, 4, -6]}
+        intensity={0.4}
+        color="#88aaff"
+      />
+      <fog attach="fog" args={["#1a3a6a", 10, 25]} />
+
+      {/* Ground plane */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.5, 0]}
+        receiveShadow
+      >
+        <planeGeometry args={[30, 30]} />
+        <meshStandardMaterial color="#3a8a28" roughness={1} />
+      </mesh>
+
+      {/* Road strip */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.49, 0]}>
+        <planeGeometry args={[5, 30]} />
+        <meshStandardMaterial color="#4a4a5c" roughness={0.9} />
+      </mesh>
+
+      <SpinningGiraffe />
+      <FloatingCoins />
+    </Canvas>
+  );
+}
+
+// ── Main StartScreen ───────────────────────────────────────────────────────────
 
 export default function StartScreen({ onPlay, onShop }: StartScreenProps) {
   const { actor, isFetching } = useActor();
@@ -29,7 +204,7 @@ export default function StartScreen({ onPlay, onShop }: StartScreenProps) {
           "linear-gradient(180deg, #0a1a3d 0%, #1a3a7a 40%, #2a5fa8 100%)",
       }}
     >
-      {/* Floating decorative animals */}
+      {/* Floating decorative animals background */}
       <div
         style={{
           position: "absolute",
@@ -46,7 +221,7 @@ export default function StartScreen({ onPlay, onShop }: StartScreenProps) {
               fontSize: 32,
               left: `${10 + i * 15}%`,
               top: `${15 + (i % 3) * 20}%`,
-              opacity: 0.18,
+              opacity: 0.15,
             }}
             animate={{
               y: [0, -12, 0],
@@ -80,7 +255,7 @@ export default function StartScreen({ onPlay, onShop }: StartScreenProps) {
           zIndex: 1,
         }}
       >
-        {/* Title art */}
+        {/* 3D Preview canvas (replaces static image) */}
         <div
           style={{
             width: "100%",
@@ -90,22 +265,14 @@ export default function StartScreen({ onPlay, onShop }: StartScreenProps) {
             borderRadius: "0 0 24px 24px",
           }}
         >
-          <img
-            src="/assets/generated/title-screen-art.dim_800x400.jpg"
-            alt="Busy Zoo title art"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "center top",
-            }}
-          />
+          <ZooPreview3D />
           <div
             style={{
               position: "absolute",
               inset: 0,
               background:
-                "linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(10,26,61,0.95) 100%)",
+                "linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(10,26,61,0.92) 100%)",
+              pointerEvents: "none",
             }}
           />
         </div>
@@ -306,6 +473,8 @@ export default function StartScreen({ onPlay, onShop }: StartScreenProps) {
     </div>
   );
 }
+
+// ── Stat pill ─────────────────────────────────────────────────────────────────
 
 function StatPill({
   icon,
